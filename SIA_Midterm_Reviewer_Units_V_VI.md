@@ -239,46 +239,4 @@ Many Unit VI ideas are Unit V principles expressed in HTTP. Seeing the link help
 | **Token bucket** | A rate-limiting method where requests spend tokens that refill steadily |
 | **OpenAPI** | The standard machine-readable description of a REST API |
 
----
 
-## Self-Check Questions
-
-Try to answer each question in your own words before checking the answer guide that follows.
-
-1. In one sentence each, when should an integration be synchronous, and when asynchronous?
-2. Name the Enterprise Integration Pattern you would use to (a) change a message's format, (b) send messages to different destinations, and (c) set aside messages that keep failing.
-3. What is the difference between ETL and ELT, and why has ELT become popular?
-4. Why is CDC described as "near real time" while ETL is not?
-5. Explain why retries and idempotency must go together.
-6. Describe what a circuit breaker does in each of its three states.
-7. Why does REST's stateless constraint make it easier to scale an API across many servers?
-8. Which HTTP methods are idempotent? Which one is not, and why does it matter?
-9. Give a URL that breaks REST naming rules and rewrite it correctly.
-10. Explain the difference between 401 and 403, and between 409 and 422.
-11. Which changes to an API require a new version, and which usually do not?
-12. What are the three habits of a reliable webhook receiver, and which Unit V principle does each one apply?
-13. When would you choose GraphQL over REST? When would you choose gRPC?
-14. Explain how a token bucket allows short bursts but still limits the average rate.
-15. What does an OpenAPI file describe, and name two things tools can do with it.
-
-## Self-Check Answer Guide
-
-1. Synchronous when the caller needs the answer to continue; asynchronous when the work is long, can happen later, or must reach several systems.
-2. (a) Message Translator, (b) Content-Based Router, (c) Dead Letter Channel.
-3. ETL transforms before loading; ELT loads raw data first and transforms inside the warehouse. Modern cloud warehouses can do the transformation themselves, and keeping raw data allows reprocessing later.
-4. CDC streams each change as it happens from the change log; ETL usually runs in scheduled batches, so data is only as fresh as the last run.
-5. A lost reply forces a retry, and without idempotency the retry can repeat the work — such as charging twice.
-6. Closed: calls pass and failures are counted. Open: calls are blocked and fail fast. Half-open: one trial call decides whether to close again or reopen.
-7. Because no server holds session memory, any server can handle any request, so more servers can simply be added behind a load balancer.
-8. GET, PUT, and DELETE are idempotent; POST is not. Retrying a POST can create duplicates, so critical POSTs need idempotency keys.
-9. Example: `GET /getBookById?id=7` becomes `GET /v1/books/7`. Use nouns and plurals, and let the method be the verb.
-10. 401: not authenticated; 403: authenticated but not allowed. 409: valid but conflicts with existing data; 422: well formed but breaks a validation rule.
-11. Renaming, removing, or changing the type of something clients use needs a new version. Adding optional fields or new endpoints usually does not.
-12. Verify the signature (security), reply fast and process later (asynchronous work), and ignore repeated event IDs (idempotency).
-13. GraphQL when many clients need different data and you want fewer, exact requests. gRPC for fast, compact calls between internal services, especially with streaming.
-14. A full bucket holds many tokens, so a burst can spend them at once; after that, requests are limited by the steady refill rate, and an empty bucket returns 429.
-15. Every endpoint, parameter, request and response shape, and status code. Tools can generate interactive documentation, generate client code, and test that the API matches its contract.
-
----
-
-> **Exam tips:** Read every option before choosing. In scenario questions, find the **key detail** first — what does the caller need, what failed, what changed? Then match it to the concept. If two options look right, pick the one that solves the **root cause**, not just the symptom.
