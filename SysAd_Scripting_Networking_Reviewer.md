@@ -184,6 +184,8 @@ When a name works with `ping` but `dig` returns nothing, the name is almost cert
 
 ## 3. Bash Scripting Basics
 
+Every example below was run on Ubuntu, and the output shown is real. Type them on your own VM; reading them is not enough.
+
 ### Anatomy of a script
 
 A script is a text file of commands that Bash runs from top to bottom.
@@ -193,12 +195,51 @@ A script is a text file of commands that Bash runs from top to bottom.
 - Run it with a path, `./script.sh`, because the current folder is not on the `PATH`. `bash script.sh` also works, even without the execute permission.
 - Lines starting with `#` are comments.
 
+```bash
+#!/bin/bash
+# hello.sh - greet the lab
+echo "Good morning, SITE Lab!"
+echo "Today is $(date +%A)."
+```
+
+```console
+$ ./hello.sh
+bash: ./hello.sh: Permission denied
+$ chmod +x hello.sh
+$ ./hello.sh
+Good morning, SITE Lab!
+Today is Wednesday.
+```
+
+The first run fails because a new file has no execute permission. After `chmod +x`, the shebang tells the kernel to hand the file to Bash.
+
 ### Variables and quoting
 
 - Assign with **no spaces** around `=`: `site="SITE Lab"`. With spaces, Bash tries to run the variable name as a command.
 - Read a variable with `$`: `echo "$site"`.
 - **Quote your variables.** Without quotes, a value containing spaces splits into several words, so `rm $file` on `old report.txt` tries to delete two files. With `"$file"` it stays one.
 - Single quotes print text literally (`'$site'` stays `$site`); double quotes allow variables to expand.
+
+```console
+$ room = "Lab 3"
+bash: room: command not found
+$ room="Lab 3"
+$ echo "Room: $room"
+Room: Lab 3
+$ echo 'Room: $room'
+Room: $room
+```
+
+Quoting in action, in an empty folder:
+
+```console
+$ report="final report.txt"
+$ touch $report
+$ ls
+final  report.txt
+```
+
+Without quotes, `touch` received two words and made two files, `final` and `report.txt`. `touch "$report"` makes the single file `final report.txt`.
 
 ### Command substitution and arithmetic
 
@@ -209,6 +250,26 @@ A script is a text file of commands that Bash runs from top to bottom.
 
 Bash arithmetic uses whole numbers only, so `$((7 / 2))` is 3.
 
+```bash
+#!/bin/bash
+# lab_count.sh - simple arithmetic on lab equipment
+pcs=40
+broken=3
+working=$((pcs - broken))
+echo "Working PCs: $working of $pcs"
+echo "Groups of 4: $((working / 4))"
+echo "Checked by $(whoami) on $(date +%Y-%m-%d)"
+```
+
+```console
+$ ./lab_count.sh
+Working PCs: 37 of 40
+Groups of 4: 9
+Checked by juan on 2026-11-04
+```
+
+Inside `$(( ))`, variables do not need `$`. Note that 37 ÷ 4 gives 9, not 9.25: the remainder is dropped.
+
 ### Input and arguments
 
 - `read -p "Prompt: " var` asks a question; `-s` hides what is typed (for passwords); `-r` keeps backslashes as typed.
@@ -216,12 +277,69 @@ Bash arithmetic uses whole numbers only, so `$((7 / 2))` is 3.
 - `${1:-default}` uses a fallback when no argument is given.
 - Scripts that run on a schedule should take **arguments**, not ask questions with `read`, because nobody is there to answer.
 
+```bash
+#!/bin/bash
+# greet.sh - greet someone by name and section
+name="${1:-Student}"
+section="${2:-no section}"
+echo "Hello, $name of $section!"
+echo "You gave $# argument(s)."
+```
+
+```console
+$ ./greet.sh Ana BSIT-2A
+Hello, Ana of BSIT-2A!
+You gave 2 argument(s).
+$ ./greet.sh
+Hello, Student of no section!
+You gave 0 argument(s).
+$ ./greet.sh "Ana Reyes"
+Hello, Ana Reyes of no section!
+You gave 1 argument(s).
+```
+
+Quotes on the command line keep `"Ana Reyes"` as one argument. With no arguments, both defaults take over.
+
+Reading input instead:
+
+```bash
+#!/bin/bash
+# login.sh - ask for a username and a hidden password
+read -p "Username: " user
+read -s -p "Password: " pass
+echo
+echo "Hi $user, your password has ${#pass} characters."
+```
+
+```console
+$ ./login.sh
+Username: juan
+Password:
+Hi juan, your password has 7 characters.
+```
+
+The password was typed but never shown. The plain `echo` moves to a new line, because `-s` also hides the Enter key. `${#pass}` is the length of the value.
+
 ### Exit status, && and ||
 
 Every command finishes with an **exit status**: `0` means success, anything else means failure. `$?` holds the status of the last command. A script sets its own with `exit 0` or `exit 1`, which tells cron or a calling script whether it worked.
 
 - `A && B` runs B only if A **succeeded**.
 - `A || B` runs B only if A **failed**. `cd /data || exit 1` is a common safety line.
+
+```console
+$ ls /etc/hostname; echo "status: $?"
+/etc/hostname
+status: 0
+$ ls /nothere; echo "status: $?"
+ls: cannot access '/nothere': No such file or directory
+status: 2
+$ mkdir -p ~/demo && echo "created"
+created
+$ cd /nothere || echo "could not enter"
+bash: cd: /nothere: No such file or directory
+could not enter
+```
 
 ### Tests and if
 
@@ -237,9 +355,63 @@ Every command finishes with an **exit status**: `0` means success, anything else
 
 Spaces inside the brackets are required: `[ -d "$dir" ]`. Use the numeric operators for numbers, not `=`. `if` can also test a command directly: `if grep -q "error" app.log; then`. An `if` can have any number of `elif` branches and one `else`, and ends with `fi`.
 
+```bash
+#!/bin/bash
+# file_type.sh - describe the path given as an argument
+if [ -z "$1" ]; then
+    echo "Usage: $0 <path>"
+    exit 1
+fi
+
+if [ -d "$1" ]; then
+    echo "$1 is a folder"
+elif [ -f "$1" ]; then
+    echo "$1 is a file"
+else
+    echo "$1 does not exist"
+fi
+```
+
+```console
+$ ./file_type.sh /etc
+/etc is a folder
+$ ./file_type.sh /etc/hostname
+/etc/hostname is a file
+$ ./file_type.sh /etc/nothing
+/etc/nothing does not exist
+$ ./file_type.sh; echo "status: $?"
+Usage: ./file_type.sh <path>
+status: 1
+```
+
+The first `if` is a **guard**: it stops the script early, with a non-zero status, when the input is missing. The second checks one condition after another and runs only the first branch that is true.
+
 ### case
 
 `case` is cleaner than a long `elif` chain when one value leads to different actions. Each option ends with `;;`, one option can list several patterns with `|`, the `*)` option catches everything else, and the block ends with `esac`. Matching is case-sensitive.
+
+```bash
+#!/bin/bash
+# lab_status.sh - turn a short code into a message
+case "$1" in
+    on|up)    echo "The lab is open." ;;
+    off|down) echo "The lab is closed." ;;
+    *)        echo "Usage: $0 {on|off}"
+              exit 1 ;;
+esac
+```
+
+```console
+$ ./lab_status.sh up
+The lab is open.
+$ ./lab_status.sh off
+The lab is closed.
+$ ./lab_status.sh OFF; echo "status: $?"
+Usage: ./lab_status.sh {on|off}
+status: 1
+```
+
+`OFF` in capitals matched nothing, so it fell through to `*)`.
 
 ### Loops
 
@@ -249,9 +421,102 @@ Spaces inside the brackets are required: `[ -d "$dir" ]`. Use the numeric operat
 - To process a file **line by line**, use `while read -r line; do …; done < file`. Add `IFS=,` to split CSV fields at commas. Avoid `for line in $(cat file)`, which splits on spaces, not lines.
 - `read` skips a final line that has no newline after it, so files should end with one.
 
+A typed list and a padded range:
+
+```console
+$ for room in 301 302 303; do echo "Checking room $room"; done
+Checking room 301
+Checking room 302
+Checking room 303
+$ for n in {01..03}; do echo "pc$n"; done
+pc01
+pc02
+pc03
+```
+
+A wildcard in a folder that has no `.csv` files, without and with the guard:
+
+```console
+$ for f in *.csv; do echo "Found $f"; done
+Found *.csv
+$ for f in *.csv; do [ -e "$f" ] || continue; echo "Found $f"; done
+```
+
+With the guard, the loop prints nothing at all, which is the correct result for an empty folder.
+
+A `while` loop that counts:
+
+```console
+$ tries=1; while [ $tries -le 3 ]; do echo "Attempt $tries"; tries=$((tries + 1)); done
+Attempt 1
+Attempt 2
+Attempt 3
+```
+
+Reading a CSV file line by line:
+
+```console
+$ cat grades.csv
+Ana Reyes,92
+Ben Cruz,74
+Carla Lim,85
+```
+
+```bash
+#!/bin/bash
+# grades.sh - read a CSV file one line at a time
+while IFS=, read -r name score; do
+    if [ "$score" -ge 75 ]; then
+        echo "PASSED  $name ($score)"
+    else
+        echo "FAILED  $name ($score)"
+    fi
+done < grades.csv
+```
+
+```console
+$ ./grades.sh
+PASSED  Ana Reyes (92)
+FAILED  Ben Cruz (74)
+PASSED  Carla Lim (85)
+```
+
+`IFS=,` splits each line at the comma, so the full name keeps its space. `< grades.csv` after `done` feeds the file into the whole loop.
+
 ### Functions
 
 A function names a block of commands so it can be reused. Inside it, `$1`, `$2`, … are the function's own arguments. Variables are shared with the rest of the script unless declared with **`local`**, which keeps them inside the function. A function is called by name, like a command: `greet "Ana"`.
+
+```bash
+#!/bin/bash
+# banner.sh - two small functions, one with a local variable
+line() {
+    echo "--------------------"
+}
+
+greet() {
+    local who="$1"
+    echo "Welcome, $who!"
+}
+
+who="outside"
+line
+greet "Ana"
+greet "Ben"
+line
+echo "who is still: $who"
+```
+
+```console
+$ ./banner.sh
+--------------------
+Welcome, Ana!
+Welcome, Ben!
+--------------------
+who is still: outside
+```
+
+Each call to `greet` gets its own `$1`. Because `who` is `local` inside the function, the variable of the same name outside it is untouched.
 
 ---
 
